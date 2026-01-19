@@ -84,6 +84,7 @@ pipeline {
 
                                 kill $FLASK_PID || true
                                 pkill -f "flask run" || true
+                                pkill -f "wiremock" || true
                             '''
                             junit 'result-rest.xml'
                         }
@@ -116,7 +117,7 @@ pipeline {
                                 tool: pyLint(pattern: 'flake8.out'),
                                 qualityGates: [
                                     [threshold: 8, type: 'TOTAL', unstable: true],
-                                    [threshold: 10, type: 'TOTAL', unstable: false]
+                                    [threshold: 10, type: 'TOTAL', unhealthy: true, unstable: false]
                                 ]
 
                             publishHTML([
@@ -147,18 +148,17 @@ pipeline {
                                 echo ${WORKSPACE}
                                 
                                 python3 -m venv venv
-                                ./venv/bin/pip install bandit
-                                
-                                ./venv/bin/bandit -r app -f json -o bandit-report.json || true
-                                ./venv/bin/bandit -r app -f xml -o bandit-report.xml || true
+                                ./venv/bin/pip install bandit bandit-sarif-formatter
+
+                                ./venv/bin/bandit -r app -f sarif -o bandit-report.sarif || true
                                 ./venv/bin/bandit -r app -f html -o bandit-report.html || true
                             '''
                             
                             recordIssues enabledForFailure: true,
-                                tool: bandit(pattern: 'bandit-report.json'),
+                                tool: sarif(pattern: 'bandit-report.sarif'),
                                 qualityGates: [
                                     [threshold: 2, type: 'TOTAL', unstable: true],
-                                    [threshold: 4, type: 'TOTAL', unstable: false]
+                                    [threshold: 4, type: 'TOTAL', unhealthy: true, unstable: false]
                                 ]
                             
                             publishHTML([
@@ -195,51 +195,19 @@ pipeline {
                                 ./venv/bin/coverage run -m pytest test/unit
                                 ./venv/bin/coverage xml -o coverage.xml
                                 ./venv/bin/coverage html -d coverage_html
-                                
                                 ./venv/bin/coverage report
-                                
-                                LINE_COV=$(./venv/bin/coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
-                                BRANCH_COV=$(./venv/bin/coverage report --show-missing | grep TOTAL | awk '{print $3}' | sed 's/%//' || echo "0")
-                                
-                                echo "========================================"
-                                echo "Line Coverage: $LINE_COV%"
-                                echo "Branch Coverage: $BRANCH_COV%"
-                                echo "========================================"
-                                
-                                FAIL=0
-                                
-                                if (( $(echo "$LINE_COV < 85" | bc -l) )); then
-                                    echo "FAILURE: Line coverage $LINE_COV% < 85%"
-                                    FAIL=1
-                                elif (( $(echo "$LINE_COV < 95" | bc -l) )); then
-                                    echo "UNSTABLE: Line coverage $LINE_COV% is between 85-95%"
-                                else
-                                    echo "SUCCESS: Line coverage $LINE_COV% >= 95%"
-                                fi
-                                
-                                if [ "$BRANCH_COV" != "0" ]; then
-                                    if (( $(echo "$BRANCH_COV < 80" | bc -l) )); then
-                                        echo "FAILURE: Branch coverage $BRANCH_COV% < 80%"
-                                        FAIL=1
-                                    elif (( $(echo "$BRANCH_COV < 90" | bc -l) )); then
-                                        echo "UNSTABLE: Branch coverage $BRANCH_COV% is between 80-90%"
-                                    else
-                                        echo "SUCCESS: Branch coverage $BRANCH_COV% >= 90%"
-                                    fi
-                                fi
-                                
-                                echo "========================================"
-                                
-                                if [ $FAIL -eq 1 ]; then
-                                    exit 1
-                                fi
-                            '''
-
+                                '''
                             recordCoverage(
-                                tools: [[parser: 'COBERTURA']],
+                                tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']],
                                 id: 'coverage',
                                 name: 'Python Coverage',
-                                sourceCodeRetention: 'EVERY_BUILD'
+                                sourceCodeRetention: 'EVERY_BUILD',
+                                qualityGates: [
+                                    [threshold: 85.0, metric: 'LINE', unstable: true],
+                                    [threshold: 95.0, metric: 'LINE', unstable: false],
+                                    [threshold: 80.0, metric: 'BRANCH', unstable: true],
+                                    [threshold: 90.0, metric: 'BRANCH', unstable: false]
+                                ]
                             )
                             
                             publishHTML([
@@ -287,7 +255,7 @@ pipeline {
                                 
                                 echo "Flask started with PID: $FLASK_PID"
                                 
-                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t test/jmeter/flask-performance.jmx \
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t ${WORKSPACE}/test/jmeter/flask-performance.jmx \
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
                                 
