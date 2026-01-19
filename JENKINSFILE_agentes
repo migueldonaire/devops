@@ -21,7 +21,7 @@ pipeline {
             }
         }
         
-        stage( 'Tests') {
+        stage( 'Tests Parallel') {
             parallel{
                 stage( 'Unit') {
                     agent {label 'mac2'}
@@ -223,8 +223,10 @@ pipeline {
                         }
                     }
                 }
+            }
+        }
 
-                stage( 'Performance') {
+        stage( 'Performance') {
                     agent {label 'mac2'}
                     steps {
                         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
@@ -264,10 +266,10 @@ pipeline {
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
 
-                                sleep 3
-                                
+                                sleep 10
+
                                 kill $FLASK_PID || true
-                                
+
                                 echo "Performance test completed"
                             '''
                             
@@ -288,10 +290,7 @@ pipeline {
                         script {
                             deleteDir()
                         }
-                        
                     }
                 }
-            }
-        }    
     }
 }
