@@ -112,9 +112,9 @@ pipeline {
                             '''
 
                             recordIssues enabledForFailure: true, 
-                            tool: flake8(pattern: 'flake8.out'),
-                            qualityGates: [[threshold: 10, type: 'TOTAL', unstable: true]]
-                            
+                            tool: pyLint(pattern: 'flake8.out'),
+                            qualityGates: [[threshold: 10, type: 'TOTAL', unhealthy: true]]
+
                             // Publicar resultados de flake8
                             publishHTML([
                                 allowMissing: true,
@@ -151,6 +151,8 @@ pipeline {
                                 ./venv/bin/coverage xml -o coverage.xml
                                 ./venv/bin/coverage html -d coverage_html
                             '''
+
+                        
                             publishCoverage adapters: [
                                 coberturaAdapter(path: 'coverage.xml')
                             ]
@@ -189,7 +191,7 @@ pipeline {
                             
                             recordIssues enabledForFailure: true,
                                         tool: bandit(pattern: 'bandit-report.json'),
-                                        qualityGates: [[threshold: 5, type: 'TOTAL', unstable: true]]
+                                        qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true], [threshold: 4, type: 'TOTAL', unhealthy: true]]
                             
                             // Publicar reporte HTML
                             publishHTML([
