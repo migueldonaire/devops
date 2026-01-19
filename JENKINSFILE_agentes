@@ -101,6 +101,34 @@ pipeline {
                         }
                     }
                 }
+
+                stage( 'Coverage') {
+                    agent {label 'mac2'}
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
+                            unstash name:'code'
+                            sh '''
+                                echo "Usuario actual:"
+                                whoami
+                                echo "Nombre del host:"
+                                hostname
+                                echo ${WORKSPACE}
+                                
+                                python3 -m venv venv
+                                ./venv/bin/pip install pytest flask coverage pytest-cov
+                                export PYTHONPATH=$WORKSPACE
+                                
+                                ./venv/bin/coverage run -m pytest test/unit test/rest
+                                ./venv/bin/coverage xml -o coverage.xml
+                                ./venv/bin/coverage html -d coverage_html
+                            '''
+                            stash name:'coverage-res', includes:'coverage.xml,coverage_html/**'
+                        }
+                        script {
+                            deleteDir()
+                        }
+                    }
+                }
             }
         }    
         stage( 'Results') {
@@ -114,7 +142,16 @@ pipeline {
                 '''
                 unstash name:'unit-res'
                 unstash name:'rest-res'
+                unstash name:'coverage-res'
                 junit 'result*.xml'
+                publishCoverage adapters: [
+                    coberturaAdapter(path: 'coverage.xml')
+                ]
+                publishHTML([
+                    reportDir: 'coverage_html',
+                    reportFiles: 'index.html',
+                    reportName: 'Coverage Report'
+                ])
                 script {
                     deleteDir()
                 }
