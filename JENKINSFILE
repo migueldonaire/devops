@@ -13,12 +13,6 @@ pipeline {
                     echo "Nombre del host:"
                     hostname
                     echo ${WORKSPACE}
-
-                    echo "=== Verificando archivos JMeter ==="
-                    ls -la test/jmeter/ || echo "No existe test/jmeter/"
-
-                    echo "=== Estructura completa del repositorio ==="
-                    find . -type f -name "*.jmx"
                 '''
                 stash name:'code', includes:'**'
                 script {
@@ -270,7 +264,7 @@ pipeline {
                                 echo "Flask started with PID: $FLASK_PID"
                                 echo "Workspace directory: $WORKSPACE_DIR"
 
-                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t $WORKSPACE_DIR/test/jmeter/flask-performance.jmx \
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t test/jmeter/flask-performance.jmx \
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
 
@@ -295,6 +289,9 @@ pipeline {
                                 reportFiles: 'index.html',
                                 reportName: 'JMeter Performance Report'
                             ])
+                        }
+                        script {
+                            deleteDir()
                         }
                         
                     }
