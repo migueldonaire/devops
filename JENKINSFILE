@@ -191,8 +191,8 @@ pipeline {
                                 python3 -m venv venv
                                 ./venv/bin/pip install pytest flask coverage pytest-cov
                                 export PYTHONPATH=$WORKSPACE
-                                
-                                ./venv/bin/coverage run -m pytest test/unit
+
+                                ./venv/bin/coverage run --branch -m pytest test/unit
                                 ./venv/bin/coverage xml -o coverage.xml
                                 ./venv/bin/coverage html -d coverage_html
                                 ./venv/bin/coverage report
@@ -254,8 +254,8 @@ pipeline {
                                 done
                                 
                                 echo "Flask started with PID: $FLASK_PID"
-                                
-                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t ${WORKSPACE}/test/jmeter/flask-performance.jmx \
+
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t "$WORKSPACE/test/jmeter/flask-performance.jmx" \
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
                                 
