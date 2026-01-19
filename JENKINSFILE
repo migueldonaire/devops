@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+    stages {
+        stage( 'Get Code') {
+            steps {
+            // Obtener código del repo
+            git 'https://github.com/anieto-unir/helloworld.git'
+            }
+        }
+        
+        stage( 'Build') {
+            steps {
+                sh '''
+                    echo 'fake build'
+                    echo WORKSPACE
+                    ls -la
+                '''
+            }
+        }
+        
+        stage('Install deps') {
+           steps {
+                sh '''
+                python3 -m venv venv
+                ./venv/bin/pip install pytest
+                ./venv/bin/pip install flask
+                '''
+            }
+        }
+        stage( 'Tests') {
+            parallel{
+                stage( 'Unit') {
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
+                            sh '''
+                                export PYTHONPATH=$WORKSPACE
+                                ./venv/bin/pytest --junitxml=result-unit.xml test/unit
+                            '''
+                        }
+                    }
+                }
+                
+                stage( 'Service') {
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
+                            sh '''
+                                export FLASK_APP=app/api.py   
+                                export FLASK_ENV=development
+                                ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
+                                java -jar /Users/migueldonaireparra/Documents/devOps/wiremock/wiremock-standalone-3.13.2.jar --port 9090 --root-dir test/wiremock  &
+                               
+                                # Esperar a Flask
+                                for i in {1..20}; do
+                                  curl -s http://127.0.0.1:5000 >/dev/null && break
+                                  sleep 1
+                                done
+
+                                # Esperar a WireMock
+                                for i in {1..20}; do
+                                  curl -s http://localhost:9090/__admin >/dev/null && break
+                                  sleep 1
+                                done
+
+                                export PYTHONPATH=$WORKSPACE
+                                ./venv/bin/pytest --junitxml=result-rest.xml test/rest
+                            '''
+                        }
+                    }
+                }
+            }
+        }    
+        stage( 'Results') {
+            steps {
+                junit 'result*.xml'
+            }
+        }
+    }
+}
