@@ -187,23 +187,55 @@ pipeline {
                                 ./venv/bin/pip install pytest flask coverage pytest-cov
                                 export PYTHONPATH=$WORKSPACE
                                 
-                                # Ejecutar coverage (solo unit, ya que Rest ya se ejecutó)
                                 ./venv/bin/coverage run -m pytest test/unit
                                 ./venv/bin/coverage xml -o coverage.xml
                                 ./venv/bin/coverage html -d coverage_html
+                                
+                                ./venv/bin/coverage report
+                                
+                                LINE_COV=$(./venv/bin/coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+                                BRANCH_COV=$(./venv/bin/coverage report --show-missing | grep TOTAL | awk '{print $3}' | sed 's/%//' || echo "0")
+                                
+                                echo "========================================"
+                                echo "Line Coverage: $LINE_COV%"
+                                echo "Branch Coverage: $BRANCH_COV%"
+                                echo "========================================"
+                                
+                                FAIL=0
+                                
+                                if (( $(echo "$LINE_COV < 85" | bc -l) )); then
+                                    echo "FAILURE: Line coverage $LINE_COV% < 85%"
+                                    FAIL=1
+                                elif (( $(echo "$LINE_COV < 95" | bc -l) )); then
+                                    echo "UNSTABLE: Line coverage $LINE_COV% is between 85-95%"
+                                else
+                                    echo "SUCCESS: Line coverage $LINE_COV% >= 95%"
+                                fi
+                                
+                                if [ "$BRANCH_COV" != "0" ]; then
+                                    if (( $(echo "$BRANCH_COV < 80" | bc -l) )); then
+                                        echo "FAILURE: Branch coverage $BRANCH_COV% < 80%"
+                                        FAIL=1
+                                    elif (( $(echo "$BRANCH_COV < 90" | bc -l) )); then
+                                        echo "UNSTABLE: Branch coverage $BRANCH_COV% is between 80-90%"
+                                    else
+                                        echo "SUCCESS: Branch coverage $BRANCH_COV% >= 90%"
+                                    fi
+                                fi
+                                
+                                echo "========================================"
+                                
+                                if [ $FAIL -eq 1 ]; then
+                                    exit 1
+                                fi
                             '''
 
-                            publishCoverage adapters: [
-                                coberturaAdapter(path: 'coverage.xml')
-                            ],
-                            sourceFileResolver: sourceFiles('STORE_ALL_BUILD'),
-                            calculateDiffForChangeRequests: true,
-                            qualityGates: [
-                                [threshold: 85.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
-                                [threshold: 95.0, metric: 'LINE', baseline: 'PROJECT', unstable: false],
-                                [threshold: 80.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true],
-                                [threshold: 90.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: false]
-                            ]
+                            recordCoverage(
+                                tools: [[parser: 'COBERTURA']],
+                                id: 'coverage',
+                                name: 'Python Coverage',
+                                sourceCodeRetention: 'EVERY_BUILD'
+                            )
                             
                             publishHTML([
                                 allowMissing: true,
