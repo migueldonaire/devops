@@ -35,7 +35,7 @@ pipeline {
                                 hostname
                                 echo ${WORKSPACE}
                                 python3 -m venv venv
-                                ./venv/bin/pip install pytest flask
+                                ./venv/bin/pip install pytest
                                 export PYTHONPATH=$WORKSPACE
                                 ./venv/bin/pytest --junitxml=result-unit.xml test/unit
                             '''
@@ -63,8 +63,8 @@ pipeline {
                                 export FLASK_APP=app/api.py   
                                 export FLASK_ENV=development
 
-                                ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
                                 pkill -f "flask run" || true
+                                ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
                                 java -jar /Users/migueldonaireparra/Documents/devOps/wiremock/wiremock-standalone-3.13.2.jar --port 9090 --root-dir test/wiremock  &
                                
                                 # Esperar a Flask
@@ -187,7 +187,7 @@ pipeline {
                             echo ${WORKSPACE}
 
                             python3 -m venv venv
-                            ./venv/bin/pip install pytest flask coverage pytest-cov
+                            ./venv/bin/pip install pytest coverage pytest-cov
                             export PYTHONPATH=$WORKSPACE
 
                             ./venv/bin/coverage run --branch -m pytest test/unit
