@@ -6,7 +6,7 @@ pipeline {
     stages {
         stage( 'Get Code') {
             steps {
-                git 'https://github.com/migueldonaire/devops.git'
+                git branch: "${env.BRANCH_NAME ?: 'feature_fix_coverage'}", url: 'https://github.com/migueldonaire/devops.git'
                 sh '''
                     echo "Usuario actual:"
                     whoami
