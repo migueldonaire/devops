@@ -6,13 +6,19 @@ pipeline {
     stages {
         stage( 'Get Code') {
             steps {
-                git 'https://github.com/anieto-unir/helloworld.git'
+                git 'https://github.com/migueldonaire/devops.git'
                 sh '''
                     echo "Usuario actual:"
                     whoami
                     echo "Nombre del host:"
                     hostname
                     echo ${WORKSPACE}
+
+                    echo "=== Verificando archivos JMeter ==="
+                    ls -la test/jmeter/ || echo "No existe test/jmeter/"
+
+                    echo "=== Estructura completa del repositorio ==="
+                    find . -type f -name "*.jmx"
                 '''
                 stash name:'code', includes:'**'
                 script {
@@ -236,7 +242,13 @@ pipeline {
                                 echo "Nombre del host:"
                                 hostname
                                 echo ${WORKSPACE}
-                                
+
+                                echo "=== DEBUG: Verificando archivos después de unstash ==="
+                                ls -la test/jmeter/ || echo "ERROR: No existe test/jmeter/"
+                                find . -type f -name "*.jmx" || echo "ERROR: No se encontraron archivos .jmx"
+                                echo "=== Contenido del workspace ==="
+                                ls -la
+
                                 python3 -m venv venv
                                 ./venv/bin/pip install flask
 
