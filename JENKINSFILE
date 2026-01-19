@@ -97,38 +97,38 @@ pipeline {
                 stage( 'Static') {
                     agent {label 'mac2'}
                     steps {
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
-                            unstash name:'code'
-                            sh '''
-                                echo "Usuario actual:"
-                                whoami
-                                echo "Nombre del host:"
-                                hostname
-                                echo ${WORKSPACE}
-                                
-                                python3 -m venv venv
-                                ./venv/bin/pip install flake8 flake8-html
-                                
-                                ./venv/bin/flake8 --format=html --htmldir=flake8_html app/ || true
-                                ./venv/bin/flake8 --format=pylint --output-file=flake8.out app/ || true
-                            '''
+                        unstash name:'code'
+                        sh '''
+                            echo "Usuario actual:"
+                            whoami
+                            echo "Nombre del host:"
+                            hostname
+                            echo ${WORKSPACE}
 
-                            recordIssues enabledForFailure: true, 
-                                tool: pyLint(pattern: 'flake8.out'),
-                                qualityGates: [
-                                    [threshold: 8, type: 'TOTAL', unstable: true],
-                                    [threshold: 10, type: 'TOTAL', unhealthy: true, unstable: false]
-                                ]
+                            python3 -m venv venv
+                            ./venv/bin/pip install flake8 flake8-html
 
-                            publishHTML([
-                                allowMissing: true,
-                                alwaysLinkToLastBuild: true,
-                                keepAll: true,
-                                reportDir: 'flake8_html',
-                                reportFiles: 'index.html',
-                                reportName: 'Flake8 HTML Report'
-                            ])
-                        }
+                            ./venv/bin/flake8 --format=html --htmldir=flake8_html app/ || true
+                            ./venv/bin/flake8 --format=pylint --output-file=flake8.out app/ || true
+                        '''
+
+                        recordIssues enabledForFailure: true,
+                            tool: pyLint(pattern: 'flake8.out'),
+                            unhealthy: 10,
+                            qualityGates: [
+                                [threshold: 8, type: 'TOTAL', unstable: true],
+                                [threshold: 10, type: 'TOTAL', unstable: false]
+                            ]
+
+                        publishHTML([
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'flake8_html',
+                            reportFiles: 'index.html',
+                            reportName: 'Flake8 HTML Report'
+                        ])
+
                         script {
                             deleteDir()
                         }
@@ -138,38 +138,38 @@ pipeline {
                 stage( 'Security Test') {
                     agent {label 'mac2'}
                     steps {
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
-                            unstash name:'code'
-                            sh '''
-                                echo "Usuario actual:"
-                                whoami
-                                echo "Nombre del host:"
-                                hostname
-                                echo ${WORKSPACE}
-                                
-                                python3 -m venv venv
-                                ./venv/bin/pip install bandit bandit-sarif-formatter
+                        unstash name:'code'
+                        sh '''
+                            echo "Usuario actual:"
+                            whoami
+                            echo "Nombre del host:"
+                            hostname
+                            echo ${WORKSPACE}
 
-                                ./venv/bin/bandit -r app -f sarif -o bandit-report.sarif || true
-                                ./venv/bin/bandit -r app -f html -o bandit-report.html || true
-                            '''
-                            
-                            recordIssues enabledForFailure: true,
-                                tool: sarif(pattern: 'bandit-report.sarif'),
-                                qualityGates: [
-                                    [threshold: 2, type: 'TOTAL', unstable: true],
-                                    [threshold: 4, type: 'TOTAL', unhealthy: true, unstable: false]
-                                ]
-                            
-                            publishHTML([
-                                allowMissing: true,
-                                alwaysLinkToLastBuild: true,
-                                keepAll: true,
-                                reportDir: '.',
-                                reportFiles: 'bandit-report.html',
-                                reportName: 'Bandit Security Report'
-                            ])
-                        }
+                            python3 -m venv venv
+                            ./venv/bin/pip install bandit bandit-sarif-formatter
+
+                            ./venv/bin/bandit -r app -f sarif -o bandit-report.sarif || true
+                            ./venv/bin/bandit -r app -f html -o bandit-report.html || true
+                        '''
+
+                        recordIssues enabledForFailure: true,
+                            tool: sarif(pattern: 'bandit-report.sarif'),
+                            unhealthy: 4,
+                            qualityGates: [
+                                [threshold: 2, type: 'TOTAL', unstable: true],
+                                [threshold: 4, type: 'TOTAL', unstable: false]
+                            ]
+
+                        publishHTML([
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: '.',
+                            reportFiles: 'bandit-report.html',
+                            reportName: 'Bandit Security Report'
+                        ])
+
                         script {
                             deleteDir()
                         }
@@ -179,46 +179,46 @@ pipeline {
                 stage( 'Coverage') {
                     agent {label 'mac3'}
                     steps {
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
-                            unstash name:'code'
-                            sh '''
-                                echo "Usuario actual:"
-                                whoami
-                                echo "Nombre del host:"
-                                hostname
-                                echo ${WORKSPACE}
-                                
-                                python3 -m venv venv
-                                ./venv/bin/pip install pytest flask coverage pytest-cov
-                                export PYTHONPATH=$WORKSPACE
+                        unstash name:'code'
+                        sh '''
+                            echo "Usuario actual:"
+                            whoami
+                            echo "Nombre del host:"
+                            hostname
+                            echo ${WORKSPACE}
 
-                                ./venv/bin/coverage run --branch -m pytest test/unit
-                                ./venv/bin/coverage xml -o coverage.xml
-                                ./venv/bin/coverage html -d coverage_html
-                                ./venv/bin/coverage report
-                                '''
-                            recordCoverage(
-                                tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']],
-                                id: 'coverage',
-                                name: 'Python Coverage',
-                                sourceCodeRetention: 'EVERY_BUILD',
-                                qualityGates: [
-                                    [threshold: 85.0, metric: 'LINE', unstable: true],
-                                    [threshold: 95.0, metric: 'LINE', unstable: false],
-                                    [threshold: 80.0, metric: 'BRANCH', unstable: true],
-                                    [threshold: 90.0, metric: 'BRANCH', unstable: false]
-                                ]
-                            )
-                            
-                            publishHTML([
-                                allowMissing: true,
-                                alwaysLinkToLastBuild: true,
-                                keepAll: true,
-                                reportDir: 'coverage_html',
-                                reportFiles: 'index.html',
-                                reportName: 'Coverage Report'
-                            ])
-                        }
+                            python3 -m venv venv
+                            ./venv/bin/pip install pytest flask coverage pytest-cov
+                            export PYTHONPATH=$WORKSPACE
+
+                            ./venv/bin/coverage run --branch -m pytest test/unit
+                            ./venv/bin/coverage xml -o coverage.xml
+                            ./venv/bin/coverage html -d coverage_html
+                            ./venv/bin/coverage report
+                        '''
+
+                        recordCoverage(
+                            tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']],
+                            id: 'coverage',
+                            name: 'Python Coverage',
+                            sourceCodeRetention: 'EVERY_BUILD',
+                            qualityGates: [
+                                [threshold: 85.0, metric: 'LINE', unstable: false],
+                                [threshold: 95.0, metric: 'LINE', unstable: true],
+                                [threshold: 80.0, metric: 'BRANCH', unstable: false],
+                                [threshold: 90.0, metric: 'BRANCH', unstable: true]
+                            ]
+                        )
+
+                        publishHTML([
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'coverage_html',
+                            reportFiles: 'index.html',
+                            reportName: 'Coverage Report'
+                        ])
+
                         script {
                             deleteDir()
                         }
@@ -255,9 +255,11 @@ pipeline {
                                 
                                 echo "Flask started with PID: $FLASK_PID"
 
-                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t "$WORKSPACE/test/jmeter/flask-performance.jmx" \
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t test/jmeter/flask-performance.jmx \
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
+
+                                sleep 10
                                 
                                 kill $FLASK_PID || true
                                 pkill -f "flask run" || true
@@ -279,9 +281,7 @@ pipeline {
                                 reportName: 'JMeter Performance Report'
                             ])
                         }
-                        script {
-                            deleteDir()
-                        }
+                        
                     }
                 }
             }
