@@ -239,23 +239,26 @@ pipeline {
                                 
                                 python3 -m venv venv
                                 ./venv/bin/pip install flask
-                                
+
                                 pkill -f "flask run" || true
                                 sleep 2
-                                
+
+                                WORKSPACE_DIR=$WORKSPACE
+
                                 export FLASK_APP=app/api.py
                                 export FLASK_ENV=development
                                 ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
                                 FLASK_PID=$!
-                                
+
                                 for i in {1..20}; do
                                 curl -s http://127.0.0.1:5000 >/dev/null && break
                                 sleep 1
                                 done
-                                
-                                echo "Flask started with PID: $FLASK_PID"
 
-                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t test/jmeter/flask-performance.jmx \
+                                echo "Flask started with PID: $FLASK_PID"
+                                echo "Workspace directory: $WORKSPACE_DIR"
+
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t $WORKSPACE_DIR/test/jmeter/flask-performance.jmx \
                                 -l jmeter-results.jtl \
                                 -e -o jmeter-report
 
