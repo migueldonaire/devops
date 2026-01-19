@@ -62,7 +62,9 @@ pipeline {
                                 ./venv/bin/pip install pytest flask
                                 export FLASK_APP=app/api.py   
                                 export FLASK_ENV=development
+
                                 ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
+                                FLASK_PID=$!
                                 java -jar /Users/migueldonaireparra/Documents/devOps/wiremock/wiremock-standalone-3.13.2.jar --port 9090 --root-dir test/wiremock  &
                                
                                 # Esperar a Flask
@@ -79,6 +81,9 @@ pipeline {
 
                                 export PYTHONPATH=$WORKSPACE
                                 ./venv/bin/pytest --junitxml=result-rest.xml test/rest
+
+                                kill $FLASK_PID || true
+                                pkill -f "flask run" || true
                             '''
                             junit 'result-rest.xml'
                         }
@@ -244,6 +249,66 @@ pipeline {
                                 reportDir: 'coverage_html',
                                 reportFiles: 'index.html',
                                 reportName: 'Coverage Report'
+                            ])
+                        }
+                        script {
+                            deleteDir()
+                        }
+                    }
+                }
+
+                stage( 'Performance') {
+                    agent {label 'mac'}
+                    steps {
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE'){
+                            unstash name:'code'
+                            sh '''
+                                echo "Usuario actual:"
+                                whoami
+                                echo "Nombre del host:"
+                                hostname
+                                echo ${WORKSPACE}
+                                
+                                python3 -m venv venv
+                                ./venv/bin/pip install flask
+                                
+                                pkill -f "flask run" || true
+                                sleep 2
+                                
+                                export FLASK_APP=app/api.py
+                                export FLASK_ENV=development
+                                ./venv/bin/flask run --host=127.0.0.1 --port=5000 --no-reload &
+                                FLASK_PID=$!
+                                
+                                for i in {1..20}; do
+                                curl -s http://127.0.0.1:5000 >/dev/null && break
+                                sleep 1
+                                done
+                                
+                                echo "Flask started with PID: $FLASK_PID"
+                                
+                                /Users/migueldonaireparra/jenkins/jmeter/bin/jmeter -n -t test/jmeter/flask-performance.jmx \
+                                -l jmeter-results.jtl \
+                                -e -o jmeter-report
+                                
+                                kill $FLASK_PID || true
+                                pkill -f "flask run" || true
+                                
+                                echo "Performance test completed"
+                            '''
+                            
+                            perfReport sourceDataFiles: 'jmeter-results.jtl',
+                                    errorUnstableThreshold: 50,
+                                    errorFailedThreshold: 75,
+                                    errorUnstableResponseTimeThreshold: 'jmeter-results.jtl:3000'
+                            
+                            publishHTML([
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'jmeter-report',
+                                reportFiles: 'index.html',
+                                reportName: 'JMeter Performance Report'
                             ])
                         }
                         script {
